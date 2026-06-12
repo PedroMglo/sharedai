@@ -1,12 +1,28 @@
 # sharedai
 
-Shared technical utilities extracted from the Local AI workspace. This package is intentionally limited to stable cross-service infrastructure: security helpers, model registry/token estimates, resource-governor contracts, and storage contracts/clients.
+Neutral shared contracts and helpers for ai-local services.
 
-Do not add domain-specific agent logic, prompts, pipelines, generated artifacts, or service-only configuration here.
+`sharedai` is published as an installable package and should be consumed as a
+dependency, for example:
 
-## Modules
+```toml
+"sharedai @ git+ssh://git@github.com/PedroMglo/sharedai.git@main"
+```
 
-- `sharedai.security`: API security headers, redaction, request IDs, secret loading, and optional FastAPI auth dependency.
-- `sharedai.llm`: model registry loading and token estimation helpers.
-- `sharedai.system.resource_governor`: shared Resource Governor v1 constants, schemas, fallback policy, client, and effective-policy builder.
-- `sharedai.storage`: storage_guardian object contracts and HTTPS client.
+## Owns
+
+- `sharedai.servicekit`: service auth helpers and health/capabilities contracts.
+- `sharedai.llm`: LLM contracts, payload builders, URL validation, token estimation, and small HTTP helpers.
+- `sharedai.evidence`: evidence metadata contracts and report formatting helpers.
+- `sharedai.system.resource_governor`: external Resource Governor contracts and typed client.
+
+## Does Not Own
+
+- Storage lifecycle, scratch policy, archive/restore, publication, managed paths, or storage intent parsing.
+- Feature-specific parsers, pipelines, APIs, adapters, caches, or probes.
+- Agent-specific prompt/task behavior.
+- Orchestrator routing, policy, reducers, event ledger, tool execution, lifecycle, or fallback behavior.
+- RAG ingestion/retrieval/enrichment internals.
+
+If a helper starts making decisions for a concrete service, move it to that
+service owner and keep `sharedai` as contracts/transport/serialization only.

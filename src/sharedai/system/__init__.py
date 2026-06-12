@@ -1,0 +1,2 @@
+"""Shared system integration contracts."""
+
