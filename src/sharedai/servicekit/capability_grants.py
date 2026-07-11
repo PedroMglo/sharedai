@@ -554,6 +554,30 @@ async def reconstruct_fastapi_request(request: Request) -> JsonValue:
     )
 
 
+def reconstruct_fastapi_raw_path(request: Request) -> str:
+    """Return the exact percent-encoded ASGI path used as transport authority."""
+
+    raw_path = request.scope.get("raw_path")
+    if not isinstance(raw_path, bytes) or not raw_path:
+        raise CapabilityGrantFormatError("capability_request_raw_path_missing")
+    try:
+        path = raw_path.decode("ascii", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise CapabilityGrantFormatError(
+            "capability_request_raw_path_not_ascii"
+        ) from exc
+    if (
+        not path.startswith("/")
+        or path.startswith("//")
+        or "?" in path
+        or "#" in path
+        or "\\" in path
+        or any(ord(char) < 0x20 or ord(char) == 0x7F for char in path)
+    ):
+        raise CapabilityGrantFormatError("capability_request_raw_path_invalid")
+    return path
+
+
 def broker_internal_token_headers(
     *,
     configured_token: str = "",
@@ -803,7 +827,7 @@ def capability_grant_dependency(
                 type=transport_type,
                 service=service,
                 method=request.method.upper(),
-                path=request.url.path,
+                path=reconstruct_fastapi_raw_path(request),
                 auth_profile=auth_profile,
                 tls_alias_profile=tls_alias_profile,
             )
@@ -879,6 +903,7 @@ __all__ = [
     "capability_grant_dependency",
     "ed25519_public_key_id",
     "public_key_from_base64url",
+    "reconstruct_fastapi_raw_path",
     "reconstruct_fastapi_request",
     "strict_json_loads",
     "token_fingerprint",

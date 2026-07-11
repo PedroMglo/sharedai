@@ -33,6 +33,13 @@ any route-specific required claims and then calls one neutral redeem callback.
 Only an explicit `True` allows the handler to run; denial, malformed data,
 unavailable authority, or absent auth fails closed.
 
+Exact transport reconstruction uses the ASGI `raw_path`, decoded strictly as
+ASCII, rather than Starlette's already percent-decoded `request.url.path`.
+The issuer and receiver therefore compare the same canonical encoded route
+(`/items/item%3Aone`, for example). Missing, non-ASCII, query-bearing or
+non-absolute raw paths fail closed; a framework-normalized path is never used
+as an authority fallback.
+
 `CapabilityGrantRedemptionRequest` contains no raw body and no broker secret:
 only grant ID/hash, token fingerprint, receiver ID, audience, request hash, and
 exact transport. Broker URL selection and I/O belong to the consumer. Optional

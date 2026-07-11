@@ -500,6 +500,59 @@ def test_dependency_reconstructs_json_body_and_query_before_single_redeem(tmp_pa
     }
 
 
+def test_dependency_preserves_percent_encoded_raw_path_for_transport_authority() -> None:
+    body = {"query": "hello", "count": 2}
+    transport = _transport(path="/v1/items/item%3Aone")
+    _, verifier, token, headers, _, _ = _grant_bundle(
+        request_payload=body,
+        transport=transport,
+    )
+    redemptions: list[CapabilityGrantRedemptionRequest] = []
+
+    async def redeem(
+        redemption: CapabilityGrantRedemptionRequest,
+        *,
+        auth_headers: Mapping[str, str],
+    ) -> bool:
+        assert auth_headers == {}
+        redemptions.append(redemption)
+        return True
+
+    app = FastAPI()
+    dependency = capability_grant_dependency(
+        verifier=verifier,
+        receiver_id="receiver-instance-1",
+        transport_type="feature_endpoint",
+        service="receiver-service",
+        redeemer=redeem,
+        auth_profile="internal_api",
+        now=lambda: NOW,
+    )
+
+    @app.post("/v1/items/{item_id}")
+    async def work_item(
+        item_id: str,
+        payload: WorkBody = Body(),
+        grant: VerifiedCapabilityGrant = Depends(dependency),
+    ) -> dict[str, Any]:
+        return {
+            "grant_id": grant.grant_id,
+            "item_id": item_id,
+            "body": payload.model_dump(),
+        }
+
+    response = TestClient(app).post(
+        "/v1/items/item%3Aone",
+        json=body,
+        headers={GRANT_HEADER: token, **headers},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["item_id"] == "item:one"
+    assert len(redemptions) == 1
+    assert redemptions[0].transport.path == "/v1/items/item%3Aone"
+
+
 def test_dependency_checks_exact_signed_claims_before_redemption() -> None:
     body = {"query": "hello", "count": 2}
     required_claims = {
