@@ -18,10 +18,20 @@ must verify schema, `max_uses=1`, `Ed25519`, time bounds, request hash, exact
 transport, and the grant/task/trace/action/attempt/idempotency headers. The
 transport model is frozen and forbids extra fields.
 
+A concrete receiver route may additionally configure an exact mapping of
+required signed claims. The dependency snapshots and validates that mapping at
+construction, then compares every required value by canonical JSON after
+signature/hash verification and before redemption. This keeps capability IDs,
+owners, permissions, data scopes, operation classes, effects, or other
+issuer-owned claims opaque to `sharedai` while allowing the receiver to bind
+its route to the authority it actually implements. A missing or inexact claim
+denies the request without consuming the one-use grant.
+
 The FastAPI dependency reconstructs GET query parameters or JSON body plus
-query parameters into the same canonical value used for hashing. It then calls
-one neutral redeem callback. Only an explicit `True` allows the handler to run;
-denial, malformed data, unavailable authority, or absent auth fails closed.
+query parameters into the same canonical value used for hashing. It verifies
+any route-specific required claims and then calls one neutral redeem callback.
+Only an explicit `True` allows the handler to run; denial, malformed data,
+unavailable authority, or absent auth fails closed.
 
 `CapabilityGrantRedemptionRequest` contains no raw body and no broker secret:
 only grant ID/hash, token fingerprint, receiver ID, audience, request hash, and

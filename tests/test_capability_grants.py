@@ -422,6 +422,7 @@ def _dependency_app(
     verifier: CapabilityGrantVerifier,
     redeemer: Any,
     redeem_auth_headers: Any = None,
+    required_claims: Mapping[str, Any] | None = None,
 ) -> tuple[FastAPI, dict[str, int]]:
     app = FastAPI()
     handler_calls = {"count": 0}
@@ -432,6 +433,7 @@ def _dependency_app(
         service="receiver-service",
         redeemer=redeemer,
         auth_profile="internal_api",
+        required_claims=required_claims,
         redeem_auth_headers=redeem_auth_headers,
         now=lambda: NOW,
     )
@@ -496,6 +498,118 @@ def test_dependency_reconstructs_json_body_and_query_before_single_redeem(tmp_pa
         "X-Internal-Token": "authority-token",
         "X-AI-Local-Capability-Receiver": "receiver-instance-1",
     }
+
+
+def test_dependency_checks_exact_signed_claims_before_redemption() -> None:
+    body = {"query": "hello", "count": 2}
+    required_claims = {
+        "capability_id": "owner.work",
+        "owner": "owner-service",
+        "permission_scopes": ["work:read"],
+        "allowed_data_scopes": ["task.goal"],
+        "allowed_effect": "read_only",
+        "operation_classes": ["owner_work"],
+    }
+    _, verifier, token, headers, _, _ = _grant_bundle(
+        request_payload=body,
+        overrides=required_claims,
+    )
+    calls = {"redeem": 0}
+
+    async def redeem(
+        _: CapabilityGrantRedemptionRequest,
+        *,
+        auth_headers: Mapping[str, str],
+    ) -> bool:
+        assert auth_headers == {}
+        calls["redeem"] += 1
+        return True
+
+    app, handler_calls = _dependency_app(
+        verifier=verifier,
+        redeemer=redeem,
+        required_claims=required_claims,
+    )
+    required_claims["capability_id"] = "mutated-after-construction"
+    response = TestClient(app).post(
+        "/v1/work",
+        json=body,
+        headers={GRANT_HEADER: token, **headers},
+    )
+
+    assert response.status_code == 200
+    assert calls["redeem"] == 1
+    assert handler_calls["count"] == 1
+
+
+@pytest.mark.parametrize(
+    "signed_claims",
+    [
+        {"capability_id": "other.work", "permission_scopes": ["work:read"]},
+        {"capability_id": "owner.work", "permission_scopes": ["work:read", "work:write"]},
+        {"permission_scopes": ["work:read"]},
+    ],
+)
+def test_dependency_rejects_wrong_or_missing_signed_claim_before_redeem(
+    signed_claims: dict[str, Any],
+) -> None:
+    body = {"query": "hello", "count": 2}
+    _, verifier, token, headers, _, _ = _grant_bundle(
+        request_payload=body,
+        overrides=signed_claims,
+    )
+    calls = {"redeem": 0}
+
+    async def redeem(
+        _: CapabilityGrantRedemptionRequest,
+        *,
+        auth_headers: Mapping[str, str],
+    ) -> bool:
+        calls["redeem"] += 1
+        return True
+
+    app, handler_calls = _dependency_app(
+        verifier=verifier,
+        redeemer=redeem,
+        required_claims={
+            "capability_id": "owner.work",
+            "permission_scopes": ["work:read"],
+        },
+    )
+    response = TestClient(app).post(
+        "/v1/work",
+        json=body,
+        headers={GRANT_HEADER: token, **headers},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "capability_grant_required_claim_mismatch"
+    assert calls["redeem"] == 0
+    assert handler_calls["count"] == 0
+
+
+def test_dependency_rejects_non_json_required_claim_configuration() -> None:
+    _, verifier, _, _, _, _ = _grant_bundle()
+
+    async def redeem(
+        _: CapabilityGrantRedemptionRequest,
+        *,
+        auth_headers: Mapping[str, str],
+    ) -> bool:
+        return True
+
+    with pytest.raises(
+        CapabilityGrantFormatError,
+        match="capability_grant_required_claims_invalid",
+    ):
+        capability_grant_dependency(
+            verifier=verifier,
+            receiver_id="receiver-instance-1",
+            transport_type="feature_endpoint",
+            service="receiver-service",
+            redeemer=redeem,
+            required_claims={"capability_id": object()},  # type: ignore[dict-item]
+        )
 
 
 def test_dependency_redeem_denial_never_calls_handler() -> None:

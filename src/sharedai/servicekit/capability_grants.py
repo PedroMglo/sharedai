@@ -680,6 +680,7 @@ class AsyncHTTPCapabilityGrantRedeemer:
 
 
 RedeemAuthHeaders: TypeAlias = Mapping[str, str] | Callable[[], Mapping[str, str]] | None
+RequiredGrantClaims: TypeAlias = Mapping[str, JsonValue] | None
 
 
 def _resolved_auth_headers(source: RedeemAuthHeaders) -> Mapping[str, str]:
@@ -696,6 +697,61 @@ def _resolved_auth_headers(source: RedeemAuthHeaders) -> Mapping[str, str]:
             raise CapabilityGrantFormatError("broker_auth_header_value_invalid")
         headers[key] = item
     return MappingProxyType(headers)
+
+
+def _required_claims_snapshot(source: RequiredGrantClaims) -> Mapping[str, bytes]:
+    """Freeze route-specific opaque claims as canonical JSON bytes."""
+
+    if source is None:
+        return MappingProxyType({})
+    if not isinstance(source, Mapping):
+        raise CapabilityGrantFormatError("capability_grant_required_claims_invalid")
+    snapshot: dict[str, bytes] = {}
+    for key, value in source.items():
+        if (
+            not isinstance(key, str)
+            or not key
+            or key != key.strip()
+            or len(key) > 200
+            or any(ord(char) < 0x20 or ord(char) == 0x7F for char in key)
+        ):
+            raise CapabilityGrantFormatError("capability_grant_required_claims_invalid")
+        try:
+            snapshot[key] = canonical_json_bytes(value)
+        except CapabilityGrantFormatError as exc:
+            raise CapabilityGrantFormatError(
+                "capability_grant_required_claims_invalid"
+            ) from exc
+    return MappingProxyType(snapshot)
+
+
+def _thaw_json(value: Any) -> JsonValue:
+    """Project an immutable verified claim back to canonical JSON types."""
+
+    if isinstance(value, Mapping):
+        return {str(key): _thaw_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json(item) for item in value]
+    return value
+
+
+def _verify_required_claims(
+    grant: VerifiedCapabilityGrant,
+    required_claims: Mapping[str, bytes],
+) -> None:
+    """Deny an inexact signed claim before the grant can be redeemed."""
+
+    for key, expected in required_claims.items():
+        if key not in grant.claims:
+            raise CapabilityGrantDenied("capability_grant_required_claim_mismatch")
+        try:
+            actual = canonical_json_bytes(_thaw_json(grant.claims[key]))
+        except CapabilityGrantFormatError as exc:
+            raise CapabilityGrantDenied(
+                "capability_grant_required_claim_mismatch"
+            ) from exc
+        if actual != expected:
+            raise CapabilityGrantDenied("capability_grant_required_claim_mismatch")
 
 
 def _single_header(request: Request, name: str, *, required: bool = True) -> str:
@@ -717,6 +773,7 @@ def capability_grant_dependency(
     redeemer: CapabilityGrantRedeemer,
     auth_profile: str | None = None,
     tls_alias_profile: str | None = None,
+    required_claims: RequiredGrantClaims = None,
     redeem_auth_headers: RedeemAuthHeaders = None,
     now: Callable[[], float] = time.time,
 ) -> Callable[[Request], Awaitable[VerifiedCapabilityGrant]]:
@@ -731,6 +788,7 @@ def capability_grant_dependency(
             raise CapabilityGrantFormatError(code)
     if not callable(redeemer):
         raise CapabilityGrantFormatError("capability_grant_redeemer_invalid")
+    required_claims_snapshot = _required_claims_snapshot(required_claims)
 
     async def require_capability_grant(request: Request) -> VerifiedCapabilityGrant:
         try:
@@ -756,6 +814,7 @@ def capability_grant_dependency(
                 headers=bound_headers,
                 now=now(),
             )
+            _verify_required_claims(grant, required_claims_snapshot)
             redemption = CapabilityGrantRedemptionRequest(
                 grant_id=grant.grant_id,
                 grant_hash=grant.grant_hash,
@@ -805,6 +864,7 @@ __all__ = [
     "GRANT_HEADER",
     "GRANT_ID_HEADER",
     "IDEMPOTENCY_HEADER",
+    "RequiredGrantClaims",
     "TASK_ID_HEADER",
     "TRACE_ID_HEADER",
     "VerifiedCapabilityGrant",
