@@ -12,6 +12,8 @@ from fastapi import Header, HTTPException
 DEFAULT_SECRET_FILE = "/run/secrets/internal_api_key"
 FILE_ENV_NAMES = ("API_KEY_FILE", "INTERNAL_API_KEY_FILE")
 ENV_NAMES = ("API_KEY", "INTERNAL_API_KEY")
+INTERNAL_FILE_ENV_NAMES = ("INTERNAL_API_KEY_FILE", "ORC_INTERNAL_API_KEY_FILE")
+INTERNAL_ENV_NAMES = ("INTERNAL_API_KEY", "ORC_INTERNAL_API_KEY")
 
 
 def read_secret_file(path_value: str) -> str:
@@ -31,6 +33,22 @@ def service_api_key(configured_key: str = "") -> str:
         if key:
             return key
     for env_name in ENV_NAMES:
+        key = os.environ.get(env_name, "").strip()
+        if key:
+            return key
+    return read_secret_file(DEFAULT_SECRET_FILE)
+
+
+def internal_service_api_key(configured_key: str = "") -> str:
+    """Resolve only the shared internal credential, never a public service key."""
+
+    if configured_key.strip():
+        return configured_key.strip()
+    for file_env in INTERNAL_FILE_ENV_NAMES:
+        key = read_secret_file(os.environ.get(file_env, ""))
+        if key:
+            return key
+    for env_name in INTERNAL_ENV_NAMES:
         key = os.environ.get(env_name, "").strip()
         if key:
             return key

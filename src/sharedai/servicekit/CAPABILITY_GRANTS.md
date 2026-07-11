@@ -38,6 +38,9 @@ Receivers can derive the issuer-compatible key identity from the mounted public
 key with `ed25519_public_key_id()` instead of maintaining a second key-ID knob.
 `service_token_dependency(..., accept_internal_token=True)` explicitly enables
 `X-Internal-Token` on a broker route; the default remains disabled.
+The broker should resolve that credential with `internal_service_api_key()` so
+generic `API_KEY`/`API_KEY_FILE` values can never substitute for internal
+receiver authentication.
 
 Service API tokens and capability grants are separate controls. Services may
 compose `service_token_dependency()` with `capability_grant_dependency()`; one

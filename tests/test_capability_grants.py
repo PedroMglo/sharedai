@@ -39,7 +39,7 @@ from sharedai.servicekit.capability_grants import (
     strict_json_loads,
     token_fingerprint,
 )
-from sharedai.servicekit.auth import verify_service_token
+from sharedai.servicekit.auth import internal_service_api_key, verify_service_token
 
 ISSUER = "test.capability.authority"
 AUDIENCE = "receiver-service"
@@ -401,6 +401,15 @@ def test_service_token_can_explicitly_accept_internal_token_without_changing_def
             x_internal_token="authority-token",
         )
     assert getattr(exc_info.value, "status_code", None) == 401
+
+
+def test_internal_service_key_never_inherits_public_service_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("API_KEY", "public-service-key")
+    monkeypatch.setenv("INTERNAL_API_KEY", "internal-service-key")
+    monkeypatch.delenv("INTERNAL_API_KEY_FILE", raising=False)
+    monkeypatch.delenv("ORC_INTERNAL_API_KEY_FILE", raising=False)
+
+    assert internal_service_api_key() == "internal-service-key"
 
 
 class WorkBody(BaseModel):
