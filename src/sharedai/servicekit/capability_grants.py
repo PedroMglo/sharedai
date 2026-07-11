@@ -49,6 +49,7 @@ ACTION_ID_HEADER = "X-Agentic-Action-ID"
 ATTEMPT_ID_HEADER = "X-Agentic-Node-Attempt"
 IDEMPOTENCY_HEADER = "Idempotency-Key"
 BROKER_TOKEN_HEADER = "X-Internal-Token"
+BROKER_RECEIVER_HEADER = "X-AI-Local-Capability-Receiver"
 
 _BOUND_HEADERS = {
     GRANT_ID_HEADER: "grant_id",
@@ -558,8 +559,9 @@ def broker_internal_token_headers(
     configured_token: str = "",
     token_file: str | Path = "",
     header_name: str = BROKER_TOKEN_HEADER,
+    receiver_id: str = "",
 ) -> Mapping[str, str]:
-    """Build fail-closed broker auth headers without choosing a broker endpoint."""
+    """Build fail-closed broker auth headers with optional receiver identity."""
 
     if not isinstance(header_name, str) or not _HTTP_TOKEN_RE.fullmatch(header_name):
         raise CapabilityGrantFormatError("broker_auth_header_name_invalid")
@@ -570,7 +572,16 @@ def broker_internal_token_headers(
         raise CapabilityGrantDenied("broker_auth_token_missing")
     if "\r" in token or "\n" in token:
         raise CapabilityGrantFormatError("broker_auth_token_invalid")
-    return MappingProxyType({header_name: token})
+    headers = {header_name: token}
+    if receiver_id:
+        if (
+            receiver_id != receiver_id.strip()
+            or len(receiver_id) > 200
+            or not _HTTP_TOKEN_RE.fullmatch(receiver_id)
+        ):
+            raise CapabilityGrantFormatError("broker_receiver_id_invalid")
+        headers[BROKER_RECEIVER_HEADER] = receiver_id
+    return MappingProxyType(headers)
 
 
 class AsyncHTTPCapabilityGrantRedeemer:
@@ -656,6 +667,9 @@ class AsyncHTTPCapabilityGrantRedeemer:
             isinstance(payload, dict)
             and payload.get("redeemed") is True
             and payload.get("grant_id") == redemption.grant_id
+            and isinstance(payload.get("event_id"), str)
+            and payload["event_id"] == payload["event_id"].strip()
+            and 0 < len(payload["event_id"]) <= 200
         )
 
     async def aclose(self) -> None:
@@ -777,6 +791,7 @@ def capability_grant_dependency(
 __all__ = [
     "ACTION_ID_HEADER",
     "ATTEMPT_ID_HEADER",
+    "BROKER_RECEIVER_HEADER",
     "BROKER_TOKEN_HEADER",
     "AsyncHTTPCapabilityGrantRedeemer",
     "CapabilityGrantDenied",

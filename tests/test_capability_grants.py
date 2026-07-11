@@ -473,7 +473,10 @@ def test_dependency_reconstructs_json_body_and_query_before_single_redeem(tmp_pa
     app, handler_calls = _dependency_app(
         verifier=verifier,
         redeemer=redeem,
-        redeem_auth_headers=lambda: broker_internal_token_headers(token_file=secret),
+        redeem_auth_headers=lambda: broker_internal_token_headers(
+            token_file=secret,
+            receiver_id="receiver-instance-1",
+        ),
     )
     response = TestClient(app).post(
         "/v1/work?mode=fast&tag=a&tag=b",
@@ -489,7 +492,10 @@ def test_dependency_reconstructs_json_body_and_query_before_single_redeem(tmp_pa
     assert redemption.request_hash == canonical_sha256(request_payload)
     assert redemption.transport == transport
     assert redemption.token_fingerprint == token_fingerprint(token)
-    assert auth_headers == {"X-Internal-Token": "authority-token"}
+    assert auth_headers == {
+        "X-Internal-Token": "authority-token",
+        "X-AI-Local-Capability-Receiver": "receiver-instance-1",
+    }
 
 
 def test_dependency_redeem_denial_never_calls_handler() -> None:
@@ -621,7 +627,14 @@ async def test_http_redeemer_posts_exact_payload_and_requires_exact_success() ->
     async def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         payload = json.loads(request.content)
-        return httpx.Response(200, json={"redeemed": True, "grant_id": payload["grant_id"]})
+        return httpx.Response(
+            200,
+            json={
+                "redeemed": True,
+                "grant_id": payload["grant_id"],
+                "event_id": "event-redeemed-1",
+            },
+        )
 
     transport = _transport()
     redemption = CapabilityGrantRedemptionRequest(
@@ -655,6 +668,8 @@ async def test_http_redeemer_posts_exact_payload_and_requires_exact_success() ->
         (403, {"redeemed": False}, False),
         (200, {"redeemed": False, "grant_id": "grant-1"}, False),
         (200, {"redeemed": True, "grant_id": "other"}, False),
+        (200, {"redeemed": True, "grant_id": "grant-1"}, False),
+        (200, {"redeemed": True, "grant_id": "grant-1", "event_id": ""}, False),
     ],
 )
 async def test_http_redeemer_denies_4xx_or_inexact_success(status: int, payload: Any, expected: bool) -> None:

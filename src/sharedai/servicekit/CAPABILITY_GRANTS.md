@@ -27,12 +27,16 @@ denial, malformed data, unavailable authority, or absent auth fails closed.
 only grant ID/hash, token fingerprint, receiver ID, audience, request hash, and
 exact transport. Broker URL selection and I/O belong to the consumer. Optional
 callback auth headers can be configured separately, including an
-`X-Internal-Token` built by `broker_internal_token_headers()`.
+`X-Internal-Token` built by `broker_internal_token_headers()`. Receivers should
+also pass their immutable identity through that helper; it emits
+`X-AI-Local-Capability-Receiver`, allowing the broker to bind a receiver-scoped
+credential to the body audience instead of trusting a caller-declared ID.
 `AsyncHTTPCapabilityGrantRedeemer` is the optional canonical HTTP adapter: its
 base URL, endpoint template, timeout, and TLS verification/CA input are all
 explicit, HTTPS is required unless insecure HTTP is deliberately enabled, it
 rejects URL credentials, follows no implicit broker route, and accepts only a 2xx JSON
-response with `redeemed: true` and the exact grant ID.
+response with `redeemed: true`, the exact grant ID, and a non-empty redemption
+event ID. A success response without causal ledger acknowledgement is denied.
 
 Receivers can derive the issuer-compatible key identity from the mounted public
 key with `ed25519_public_key_id()` instead of maintaining a second key-ID knob.
