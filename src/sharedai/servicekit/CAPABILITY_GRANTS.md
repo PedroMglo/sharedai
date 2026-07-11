@@ -18,10 +18,27 @@ must verify schema, `max_uses=1`, `Ed25519`, time bounds, request hash, exact
 transport, and the grant/task/trace/action/attempt/idempotency headers. The
 transport model is frozen and forbids extra fields.
 
+A concrete receiver route may additionally configure an exact mapping of
+required signed claims. The dependency snapshots and validates that mapping at
+construction, then compares every required value by canonical JSON after
+signature/hash verification and before redemption. This keeps capability IDs,
+owners, permissions, data scopes, operation classes, effects, or other
+issuer-owned claims opaque to `sharedai` while allowing the receiver to bind
+its route to the authority it actually implements. A missing or inexact claim
+denies the request without consuming the one-use grant.
+
 The FastAPI dependency reconstructs GET query parameters or JSON body plus
-query parameters into the same canonical value used for hashing. It then calls
-one neutral redeem callback. Only an explicit `True` allows the handler to run;
-denial, malformed data, unavailable authority, or absent auth fails closed.
+query parameters into the same canonical value used for hashing. It verifies
+any route-specific required claims and then calls one neutral redeem callback.
+Only an explicit `True` allows the handler to run; denial, malformed data,
+unavailable authority, or absent auth fails closed.
+
+Exact transport reconstruction uses the ASGI `raw_path`, decoded strictly as
+ASCII, rather than Starlette's already percent-decoded `request.url.path`.
+The issuer and receiver therefore compare the same canonical encoded route
+(`/items/item%3Aone`, for example). Missing, non-ASCII, query-bearing or
+non-absolute raw paths fail closed; a framework-normalized path is never used
+as an authority fallback.
 
 `CapabilityGrantRedemptionRequest` contains no raw body and no broker secret:
 only grant ID/hash, token fingerprint, receiver ID, audience, request hash, and

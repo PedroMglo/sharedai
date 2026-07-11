@@ -36,6 +36,10 @@ exact transport, time bounds, and task/trace/action/grant headers. A FastAPI
 dependency reconstructs the request hash and calls a caller-provided redeem
 callback before the route handler can run.
 
+Routes can also provide an exact mapping of required signed claims. Those
+opaque values are checked canonically before redemption, so a grant for the
+wrong capability or permission is denied without consuming its single use.
+
 The package does not issue grants, decide policy, own replay state, or select a
 broker URL. The redeem callback owns that integration. Optional broker auth
 headers are supplied explicitly; `broker_internal_token_headers()` can read a
