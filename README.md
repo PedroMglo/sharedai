@@ -26,3 +26,22 @@ dependency, for example:
 
 If a helper starts making decisions for a concrete service, move it to that
 service owner and keep `sharedai` as contracts/transport/serialization only.
+
+## Capability grant receiver boundary
+
+`sharedai.servicekit.capability_grants` provides the domain-neutral receiver
+half of a single-use capability grant protocol. It verifies a compact Ed25519
+token against an explicitly configured issuer, key ID, audience, exact request,
+exact transport, time bounds, and task/trace/action/grant headers. A FastAPI
+dependency reconstructs the request hash and calls a caller-provided redeem
+callback before the route handler can run.
+
+The package does not issue grants, decide policy, own replay state, or select a
+broker URL. The redeem callback owns that integration. Optional broker auth
+headers are supplied explicitly; `broker_internal_token_headers()` can read a
+configured token or token file using the existing servicekit secret reader.
+This is independent of `service_token_dependency()`, which remains the service
+API authentication layer and may be composed on the same route.
+
+See [`src/sharedai/servicekit/CAPABILITY_GRANTS.md`](src/sharedai/servicekit/CAPABILITY_GRANTS.md)
+for the wire and dependency contract.

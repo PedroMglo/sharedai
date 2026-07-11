@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Neutral shared contracts and helpers for ai-local services"
 requires-python = ">=3.11"
 dependencies = [
+  "cryptography>=44",
   "fastapi>=0.110",
   "httpx>=0.27",
   "pydantic>=2",
@@ -13,6 +14,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8",
+  "pytest-asyncio>=0.23",
   "ruff>=0.4",
 ]
 

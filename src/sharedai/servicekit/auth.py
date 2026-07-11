@@ -43,6 +43,8 @@ def verify_service_token(
     configured_key: str = "",
     authorization: str | None = None,
     x_api_key: str | None = None,
+    x_internal_token: str | None = None,
+    accept_internal_token: bool = False,
 ) -> None:
     expected = service_api_key(configured_key)
     if not expected:
@@ -51,7 +53,8 @@ def verify_service_token(
     bearer = ""
     if authorization and authorization.startswith("Bearer "):
         bearer = authorization.removeprefix("Bearer ").strip()
-    provided = (x_api_key or bearer).strip()
+    internal_token = x_internal_token if accept_internal_token else None
+    provided = (x_api_key or bearer or internal_token or "").strip()
     if not provided:
         raise HTTPException(status_code=401, detail="Missing API key")
     if not secrets.compare_digest(provided, expected):
@@ -61,18 +64,23 @@ def verify_service_token(
 def service_token_dependency(
     service_name: str,
     configured_key: Callable[[], str],
-) -> Callable[[str | None, str | None], None]:
+    *,
+    accept_internal_token: bool = False,
+) -> Callable[..., None]:
     """Build a FastAPI dependency that verifies the shared service token."""
 
     def require_service_token(
         authorization: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+        x_internal_token: str | None = Header(default=None, alias="X-Internal-Token"),
     ) -> None:
         verify_service_token(
             service_name=service_name,
             configured_key=configured_key(),
             authorization=authorization,
             x_api_key=x_api_key,
+            x_internal_token=x_internal_token,
+            accept_internal_token=accept_internal_token,
         )
 
     return require_service_token
