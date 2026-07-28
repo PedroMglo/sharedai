@@ -36,3 +36,20 @@ def test_resource_governor_fallback_client() -> None:
     decision = ResourceGovernorClient(fallback_enabled=True).request_lease(request)
 
     assert decision.granted
+
+
+def test_document_ocr_gpu_lease_contract_is_shared() -> None:
+    request = LeaseRequest(
+        operation_id="document.ocr",
+        idempotency_key="document:test",
+        requester="extrator",
+        component="features/extrator",
+        lane=Lane.HEAVY_GPU,
+        lease_scope=LeaseScope.BATCH,
+        resource_class=ResourceClass.VRAM,
+        capability=Capability.DOCUMENT_OCR_GPU,
+        estimated_vram_mb=8192,
+    )
+
+    assert request.capability == Capability.DOCUMENT_OCR_GPU
+    assert request.operation_id == "document.ocr"

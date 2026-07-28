@@ -34,7 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictStr, Valid
 
 from sharedai.servicekit.auth import read_secret_file
 
-JsonScalar: TypeAlias = None | bool | int | float | str
+JsonScalar: TypeAlias = bool | int | float | str | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 
 _B64URL_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -876,6 +876,11 @@ __all__ = [
     "ATTEMPT_ID_HEADER",
     "BROKER_RECEIVER_HEADER",
     "BROKER_TOKEN_HEADER",
+    "GRANT_HEADER",
+    "GRANT_ID_HEADER",
+    "IDEMPOTENCY_HEADER",
+    "TASK_ID_HEADER",
+    "TRACE_ID_HEADER",
     "AsyncHTTPCapabilityGrantRedeemer",
     "CapabilityGrantDenied",
     "CapabilityGrantError",
@@ -885,12 +890,7 @@ __all__ = [
     "CapabilityGrantRedemptionRequest",
     "CapabilityGrantTransport",
     "CapabilityGrantVerifier",
-    "GRANT_HEADER",
-    "GRANT_ID_HEADER",
-    "IDEMPOTENCY_HEADER",
     "RequiredGrantClaims",
-    "TASK_ID_HEADER",
-    "TRACE_ID_HEADER",
     "VerifiedCapabilityGrant",
     "b64url_decode",
     "b64url_encode",

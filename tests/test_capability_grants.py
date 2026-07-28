@@ -11,6 +11,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, ValidationError
 
+from sharedai.servicekit.auth import internal_service_api_key, verify_service_token
 from sharedai.servicekit.capability_grants import (
     ACTION_ID_HEADER,
     ATTEMPT_ID_HEADER,
@@ -39,7 +40,6 @@ from sharedai.servicekit.capability_grants import (
     strict_json_loads,
     token_fingerprint,
 )
-from sharedai.servicekit.auth import internal_service_api_key, verify_service_token
 
 ISSUER = "test.capability.authority"
 AUDIENCE = "receiver-service"
