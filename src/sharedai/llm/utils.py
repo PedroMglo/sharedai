@@ -25,6 +25,6 @@ def mask_url(url: str) -> str:
         if parsed.password:
             netloc = f"{parsed.hostname}:{parsed.port}" if parsed.port else (parsed.hostname or "")
             return parsed._replace(netloc=netloc).geturl()
-    except Exception:
-        pass
+    except (TypeError, ValueError):
+        return url
     return url
