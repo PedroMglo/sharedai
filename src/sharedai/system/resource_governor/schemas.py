@@ -189,6 +189,12 @@ class ActivityRequest(_Model):
     ttl_seconds: int = 30
 
 
+class ActivityHeartbeat(_Model):
+    activity_id: str
+    requester: str | None = None
+    request_id: str | None = None
+
+
 class LeaseRecord(_Model):
     lease_id: str
     request: LeaseRequest
