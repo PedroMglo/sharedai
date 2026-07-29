@@ -12,6 +12,8 @@ from sharedai.system.resource_governor.constants import (
     DEFAULT_LEASE_TTL_SECONDS,
 )
 from sharedai.system.resource_governor.schemas import (
+    ActivityRecord,
+    ActivityRequest,
     DecisionType,
     LeaseDecision,
     LeaseDecisionKind,
@@ -69,6 +71,51 @@ class ResourceGovernorClient:
             raise RuntimeError("AI_RESOURCE_GOVERNOR_URL is not configured")
         response = httpx.delete(
             f"{self.base_url}/resources/leases/{lease_id}",
+            headers=self._headers(),
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return dict(response.json())
+
+    def register_activity(self, request: ActivityRequest) -> ActivityRecord:
+        if not self.base_url:
+            raise RuntimeError("AI_RESOURCE_GOVERNOR_URL is not configured")
+        response = httpx.post(
+            f"{self.base_url}/resources/activity",
+            headers=self._headers(),
+            json=request.model_dump(mode="json"),
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return ActivityRecord.model_validate(response.json())
+
+    def heartbeat_activity(
+        self,
+        activity_id: str,
+        *,
+        requester: str | None = None,
+        request_id: str | None = None,
+    ) -> ActivityRecord:
+        if not self.base_url:
+            raise RuntimeError("AI_RESOURCE_GOVERNOR_URL is not configured")
+        response = httpx.post(
+            f"{self.base_url}/resources/activity/{activity_id}/heartbeat",
+            headers=self._headers(),
+            json={
+                "activity_id": activity_id,
+                "requester": requester,
+                "request_id": request_id,
+            },
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return ActivityRecord.model_validate(response.json())
+
+    def release_activity(self, activity_id: str) -> dict[str, Any]:
+        if not self.base_url:
+            raise RuntimeError("AI_RESOURCE_GOVERNOR_URL is not configured")
+        response = httpx.delete(
+            f"{self.base_url}/resources/activity/{activity_id}",
             headers=self._headers(),
             timeout=self.timeout,
         )
